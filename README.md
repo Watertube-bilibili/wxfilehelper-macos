@@ -4,7 +4,7 @@
 
 ## 中文
 
-使用 Qt Widgets 构建的原生 macOS 文件传输助手。与微信扫码授权后，可通过「文件传输助手」在手机和 Mac 之间发送文字、图片及文件。点击 `+` 打开第二个账号标签。切换标签时，账号各自的消息、草稿和文件列表都保留，传输继续。
+使用 Qt Widgets 构建的原生 macOS 文件传输助手，普通窗口在左侧显示会话导航。与微信扫码授权后，可通过「文件传输助手」在手机和 Mac 之间发送文字、图片及文件。点击 `+` 打开第二个账号标签。切换标签时，账号各自的消息、草稿和文件列表都保留，传输继续。
 
 把文件拖入窗口或使用「添加文件」，核对文件名和大小后点击发送。发送中途可以选择「完成此项后停止」。每批最多 100 个文件，每个文件最多 25 MiB。「另存为」会打开原生保存对话框。大屏模式放大文字、触控按钮和二维码，并隐藏昵称。自动更新检查指向此仓库的 GitHub Releases。
 
@@ -27,7 +27,7 @@ Windows 下载见 [Windows 独立仓库](https://github.com/Watertube-bilibili/w
 
 ## English
 
-A native macOS file transfer utility built with Qt Widgets. Scan the QR code with WeChat to send text, photos and files between your phone and Mac using the File Transfer conversation. Click `+` for a second account. Tabs keep separate sessions, messages, drafts and file queues. Transfers continue when you switch.
+A native macOS file transfer utility built with Qt Widgets, with a sidebar in regular windows. Scan the QR code with WeChat to send text, photos and files between your phone and Mac using the File Transfer conversation. Click `+` for a second account. Tabs keep separate sessions, messages, drafts and file queues. Transfers continue when you switch.
 
 Drop files into the window or click Add files. Review the queue and click Send. You can stop after the current item and keep the rest for later. Each batch supports up to 100 files, up to 25 MiB each. Save as opens a native file picker. Classroom mode enlarges text, controls and the QR code while hiding nicknames. The updater checks this repository's GitHub Releases.
 
