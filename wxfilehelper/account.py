@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from .protocol import FileHelperClient, MAX_FILE_SIZE, Message, safe_filename
-from .widgets import FILE_KINDS, Composer, LoginWorker, Task, label, size_text, tr
+from .widgets import FILE_KINDS, Composer, LoginWorker, Task, control_icon, label, size_text, tr
 
 MAX_BATCH_FILES = 100
 
@@ -62,6 +62,8 @@ class AccountPane(QWidget):
         self.unread = 0
         self.selected = False
         self.classroom = False
+        self.inline_nav = True
+        self.queue_rows = 2
         self.files_only = False
         self.qr_pixmap = None
         self.feedback_key = ""
@@ -117,26 +119,28 @@ class AccountPane(QWidget):
         self.chat_layout = QVBoxLayout(chat)
         self.chat_layout.setContentsMargins(20, 8, 20, 10)
         self.chat_layout.setSpacing(8)
-        nav = QHBoxLayout()
+        self.nav = QWidget()
+        nav = QHBoxLayout(self.nav)
+        nav.setContentsMargins(0, 0, 0, 0)
         self.status = label(name="State")
         self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         nav.addWidget(self.status, 1)
         self.chat_button = QPushButton(objectName="Filter", checkable=True)
         self.files_button = QPushButton(objectName="Filter", checkable=True)
-        self.chat_button.clicked.connect(lambda: self._filter(False))
-        self.files_button.clicked.connect(lambda: self._filter(True))
+        self.chat_button.clicked.connect(lambda: self.filter_messages(False))
+        self.files_button.clicked.connect(lambda: self.filter_messages(True))
         self.relogin_button = QPushButton(objectName="Primary")
         self.relogin_button.clicked.connect(self.start_login)
         for button in (self.chat_button, self.files_button, self.relogin_button):
             nav.addWidget(button)
-        self.chat_layout.addLayout(nav)
+        self.chat_layout.addWidget(self.nav)
 
         self.scroll = QScrollArea(widgetResizable=True, objectName="History")
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         stream = QWidget(objectName="Stream")
         self.stream_layout = QVBoxLayout(stream)
-        self.stream_layout.setContentsMargins(10, 10, 10, 10)
-        self.stream_layout.setSpacing(9)
+        self.stream_layout.setContentsMargins(0, 14, 0, 12)
+        self.stream_layout.setSpacing(12)
         self.empty = QWidget()
         empty_layout = QVBoxLayout(self.empty)
         empty_layout.addStretch()
@@ -155,8 +159,8 @@ class AccountPane(QWidget):
 
         frame = QFrame(objectName="Composer")
         controls = QVBoxLayout(frame)
-        controls.setContentsMargins(12, 9, 12, 9)
-        controls.setSpacing(6)
+        controls.setContentsMargins(0, 9, 0, 7)
+        controls.setSpacing(7)
         self.queue = QWidget()
         queue_layout = QVBoxLayout(self.queue)
         queue_layout.setContentsMargins(0, 0, 0, 0)
@@ -193,7 +197,7 @@ class AccountPane(QWidget):
         self.feedback.hide()
         controls.addWidget(self.feedback)
         toolbar = QHBoxLayout()
-        self.attach_button = QPushButton(objectName="Quiet")
+        self.attach_button = QPushButton(icon=control_icon("add"))
         self.attach_button.clicked.connect(self.choose_files)
         self.image_button = QPushButton(objectName="Quiet")
         self.image_button.clicked.connect(lambda: self.choose_files(image=True))
@@ -214,8 +218,8 @@ class AccountPane(QWidget):
     def translate(self, language, *, redraw=True):
         self.language = language
         for widget, key in (
-            (self.scan_title, "scan"), (self.scan_hint, "scan_hint"), (self.chat_button, "chat"),
-            (self.files_button, "files"), (self.relogin_button, "relogin"), (self.session_hint, "session_hint"),
+            (self.scan_title, "scan"), (self.scan_hint, "scan_hint"), (self.chat_button, "all_messages"),
+            (self.files_button, "files_only"), (self.relogin_button, "relogin"), (self.session_hint, "session_hint"),
             (self.attach_button, "attach"), (self.image_button, "image"), (self.remove_button, "remove"),
             (self.clear_button, "clear"), (self.stop_button, "stop"),
         ):
@@ -228,19 +232,23 @@ class AccountPane(QWidget):
         if redraw:
             self._invalidate_rows()
 
-    def set_display(self, width, height, classroom):
+    def set_display(self, width, height, classroom, *, inline_nav=True):
         redraw = classroom != self.classroom
+        nav_changed = self.inline_nav != inline_nav or redraw
+        self.inline_nav = inline_nav
         self.classroom = classroom
-        padding = max(12 if width < 750 else 22, (width - (1240 if classroom else 1120)) // 2)
-        self.chat_layout.setContentsMargins(padding, 6, padding, 8)
-        self.composer.setFixedHeight(88 if classroom and height >= 750 else 56 if height < 655 else 76)
-        self.pending_list.setFixedHeight(56 if height < 655 else 94 if classroom else 76)
+        padding = max(16 if width < 675 else 24, (width - (1240 if classroom else 1080)) // 2)
+        self.chat_layout.setContentsMargins(padding, 4, padding, 8)
+        self.composer.setFixedHeight(100 if classroom and height >= 750 else 52 if height < 500 else 78)
+        self.queue_rows = 1 if height < 500 else 2 if height < 690 else 3
+        self._fit_pending_list()
         qr_size = min(372 if classroom else 224, max(150, int(height * (.36 if classroom else .34))))
         if qr_size != self.qr_label.width():
             self.qr_label.setFixedSize(qr_size, qr_size)
             self._fit_qr()
-        if redraw:
+        if nav_changed:
             self._state_ui()
+        if redraw:
             self._invalidate_rows()
 
     def select(self, selected):
@@ -261,7 +269,12 @@ class AccountPane(QWidget):
             status += " · " + self.nickname
         self.status.setText(self.t("archived") if current == "expired" and self.account_id else status)
         self.login_status.setText(self.t(current))
-        self.relogin_button.setVisible(current == "expired" and bool(self.account_id))
+        relogin = current == "expired" and bool(self.account_id)
+        self.nav.setVisible(self.inline_nav or relogin)
+        self.status.setVisible(self.inline_nav)
+        self.chat_button.setVisible(self.inline_nav)
+        self.files_button.setVisible(self.inline_nav)
+        self.relogin_button.setVisible(relogin)
         self.refresh_button.setText(self.t("sign_in" if current == "signed_out" else "refresh"))
         self.refresh_button.setEnabled(current in ("signed_out", "waiting", "confirm", "expired", "error") and not self.active_task)
         if current in ("expired", "error", "signed_out", "stopping"):
@@ -405,9 +418,10 @@ class AccountPane(QWidget):
         self._set_feedback()
         self._invalidate_rows()
 
-    def _filter(self, files_only):
+    def filter_messages(self, files_only):
         self.files_only = files_only
         self._render_messages()
+        self.changed.emit()
 
     def _invalidate_rows(self):
         for _, row in self.rows.values():
@@ -448,28 +462,35 @@ class AccountPane(QWidget):
         layout = QHBoxLayout(row)
         layout.setContentsMargins(0, 0, 0, 0)
         bubble = QFrame(objectName="Outgoing" if message.outgoing else "Incoming")
-        bubble.setMaximumWidth(745 if self.classroom else 530)
+        is_file = message.kind in FILE_KINDS
+        maximum = 740 if self.classroom else 455
+        longest = max(message.text.splitlines() or [""], key=len)
+        width = self.fontMetrics().horizontalAdvance(longest) + 34
+        bubble.setMaximumWidth(min(maximum, max(244 if is_file else 154, width)))
         box = QVBoxLayout(bubble)
-        box.setContentsMargins(12, 8, 12, 8)
-        box.setSpacing(4)
+        box.setContentsMargins(13, 9, 13, 9)
+        box.setSpacing(5)
         who = self.t("you" if message.outgoing else "phone")
-        box.addWidget(label(who + " · " + time.strftime("%H:%M", time.localtime(message.timestamp)), "Muted"))
+        summary = QHBoxLayout()
+        summary.addWidget(label(who + " · " + time.strftime("%H:%M", time.localtime(message.timestamp)), "Muted"))
+        summary.addStretch()
+        if message.kind == "text":
+            copy = QPushButton(self.t("copy"), objectName="Inline")
+            copy.clicked.connect(lambda: QApplication.clipboard().setText(message.text))
+            summary.addWidget(copy)
+        box.addLayout(summary)
         content = label(message.text, wrap=True)
         content.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         content.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.TextSelectableByKeyboard)
         box.addWidget(content)
-        if message.kind in FILE_KINDS:
+        if is_file:
             line = QHBoxLayout()
             line.addWidget(label(size_text(message.size) if message.size else message.kind.upper(), "Muted"))
             line.addStretch()
-            action = QPushButton(self.t("open_folder" if message.local_path else "download"), objectName="Quiet")
+            action = QPushButton(self.t("open_folder" if message.local_path else "download"), objectName="Inline")
             action.clicked.connect(lambda: self._file_action(message))
             line.addWidget(action)
             box.addLayout(line)
-        elif message.kind == "text":
-            copy = QPushButton(self.t("copy"), objectName="Quiet")
-            copy.clicked.connect(lambda: QApplication.clipboard().setText(message.text))
-            box.addWidget(copy, alignment=Qt.AlignmentFlag.AlignLeft)
         if message.outgoing:
             layout.addStretch(1)
         layout.addWidget(bubble, 4)
@@ -561,7 +582,13 @@ class AccountPane(QWidget):
         self.pending_label.setText(summary)
         self.pending_list.setAccessibleName(summary)
         self.queue.setVisible(bool(self.pending))
+        self._fit_pending_list()
         self._controls()
+
+    def _fit_pending_list(self):
+        count = min(self.queue_rows, max(1, self.pending_list.count()))
+        row = max(self.pending_list.sizeHintForRow(0), self.pending_list.fontMetrics().height() + 6)
+        self.pending_list.setFixedHeight(count * row + 16)
 
     def _set_feedback(self, key="", detail="", **values):
         self.feedback_key, self.feedback_detail, self.feedback_values = key, detail, values

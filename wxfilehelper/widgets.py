@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, Signal, QObject, QRunnable
+from PySide6.QtCore import Qt, QPointF, QThread, Signal, QObject, QRunnable
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QLabel, QPlainTextEdit
 
@@ -12,7 +12,8 @@ from .protocol import ProtocolError, SessionExpired, Cancelled
 
 TEXT = {
     "title": ("文件传输助手", "File Transfer"),
-    "chat": ("全部消息", "All messages"), "files": ("仅看文件", "Files only"),
+    "chat": ("文件传输", "File transfer"), "files": ("本次会话文件", "Session files"),
+    "all_messages": ("全部消息", "All messages"), "files_only": ("仅看文件", "Files only"),
     "folder": ("下载文件夹", "Downloads folder"), "about": ("关于与开源代码", "About & source code"),
     "menu": ("更多选项", "More options"),
     "account": ("账号 {n}", "Account {n}"), "add_account": ("添加第二个账号", "Add a second account"),
@@ -62,7 +63,7 @@ TEXT = {
     "updates": ("检查更新", "Check for updates"), "checking": ("正在检查更新…", "Checking for updates…"),
     "current": ("当前已是最新版本", "You are up to date"),
     "new_version": ("发现新版本 {version} · 查看更新", "Update {version} available · View release"),
-    "update_failed": ("暂时无法检查更新，点击重试", "Update check failed · click to retry"),
+    "update_failed": ("重试更新检查", "Retry update check"),
 }
 
 FILE_KINDS = frozenset(("file", "image", "video", "voice"))
@@ -84,6 +85,33 @@ def app_icon(size=64) -> QIcon:
     for x1, y1, x2, y2 in ((.25, .37, .75, .37), (.62, .24, .75, .37), (.62, .50, .75, .37),
                            (.75, .65, .25, .65), (.38, .52, .25, .65), (.38, .78, .25, .65)):
         painter.drawLine(int(size*x1), int(size*y1), int(size*x2), int(size*y2))
+    painter.end()
+    return QIcon(pixmap)
+
+
+def control_icon(name: str) -> QIcon:
+    """Original 16 px line icons for the navigation and tab controls."""
+    lines = {
+        "add": (((8, 3), (8, 13)), ((3, 8), (13, 8))),
+        "close": (((4, 4), (12, 12)), ((4, 12), (12, 4))),
+        "chat": (((2.5, 3), (13.5, 3), (13.5, 11), (7, 11), (4, 14), (4, 11), (2.5, 11), (2.5, 3)),
+                 ((5.5, 7), (10.5, 7))),
+        "file": (((4, 2), (9, 2), (12.5, 5.5), (12.5, 14), (4, 14), (4, 2)),
+                 ((9, 2), (9, 5.5), (12.5, 5.5)), ((6, 9), (10.5, 9)), ((6, 11.5), (10.5, 11.5))),
+    }
+    pixmap = QPixmap(32, 32)
+    pixmap.setDevicePixelRatio(2)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(QColor("#42536a"), 1.35, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    if name == "menu":
+        for x in (3.5, 8, 12.5):
+            painter.drawPoint(QPointF(x, 8))
+    else:
+        for line in lines[name]:
+            for first, second in zip(line, line[1:]):
+                painter.drawLine(QPointF(*first), QPointF(*second))
     painter.end()
     return QIcon(pixmap)
 
