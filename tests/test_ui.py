@@ -81,6 +81,25 @@ def test_classroom_retains_tab_controls_and_hides_both_names(window):
     window._leave_classroom()
     assert "Private" in window.tabs.tabToolTip(1)
 
+def test_sidebar_collapses_without_losing_current_account_filter(window, app):
+    window.resize(1024, 680)
+    first = window.current_account
+    second = window.add_account()
+    for n, pane in enumerate((first, second)):
+        pane.account_id = str(n + 1)
+        pane.pages.setCurrentIndex(1)
+        pane._set_state("online")
+    assert window.rail.isVisible() and not second.files_button.isVisible()
+    QTest.mouseClick(window.rail_files, Qt.MouseButton.LeftButton)
+    assert second.files_only and not first.files_only
+    window.tabs.setCurrentIndex(0)
+    assert window.rail_chat.isChecked()
+    window.tabs.setCurrentIndex(1)
+    window.resize(590, 430)
+    app.processEvents()
+    assert not window.rail.isVisible()
+    assert second.files_button.isVisible() and second.files_button.isChecked()
+
 
 @pytest.mark.parametrize("size", [(590, 430), (1024, 560), (1280, 720), (1920, 1080), (3840, 2160)])
 def test_send_stays_on_screen_with_a_file_queue(window, app, tmp_path, size):
