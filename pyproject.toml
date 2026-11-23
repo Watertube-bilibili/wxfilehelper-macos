@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wxfilehelper-macos"
+version = "0.2.0b1"
+description = "Native Qt desktop client for WeChat File Transfer"
+requires-python = ">=3.11"
+license = "AGPL-3.0-only"
+authors = [{name = "wxfilehelper-macos contributors"}]
+dependencies = ["PySide6-Essentials==6.12.0", "requests==2.34.2", "defusedxml==0.7.1"]
+
+[project.scripts]
+wxfilehelper = "wxfilehelper.app:main"
+
+[tool.setuptools.packages.find]
+include = ["wxfilehelper*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
