@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - 'native/**'
+      - 'LICENSE'
+      - 'DISCLAIMER.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'licenses/ItChat-MIT.txt'
+      - 'licenses/WXFileHelper-MIT.txt'
       - '.github/workflows/macos-native.yml'
 permissions:
   contents: read
