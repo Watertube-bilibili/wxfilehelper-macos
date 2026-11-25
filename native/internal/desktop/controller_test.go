@@ -165,3 +165,43 @@ func TestDuplicateAccountRejectedAndCloseIsSafe(t *testing.T) {
 		t.Fatal("closed controller accepted a new tab")
 	}
 }
+
+func TestPhoneAttachmentAndLocalEchoStayDistinct(t *testing.T) {
+	receipt := wechat.Message{ID: "server", ClientID: "client1", Outgoing: true, Kind: "file", Text: "slides.pptx", MediaID: "uploaded", Sender: "owner"}
+	echo := wechat.Message{ID: "sync", AlternateID: "server", Kind: "file", Text: "slides.pptx", MediaID: "refreshed", Sender: "owner"}
+	for _, echoFirst := range []bool{false, true} {
+		a := &account{}
+		if echoFirst {
+			appendMessage(a, echo, true)
+			appendMessage(a, receipt, false)
+		} else {
+			appendMessage(a, receipt, false)
+			appendMessage(a, echo, true)
+		}
+		incoming := echo
+		incoming.ID, incoming.AlternateID = "other", ""
+		appendMessage(a, incoming, true)
+		if len(a.Messages) != 2 || !a.Messages[0].Outgoing || a.Messages[0].MediaID != "refreshed" ||
+			a.Messages[0].ClientID != "client1" || a.Messages[1].Outgoing || !a.Messages[1].CanDownload() {
+			t.Fatal("receipt and echo must merge, and the phone's separate upload must stay incoming")
+		}
+	}
+}
+
+func TestRuntimeUpdateChecksKeepLastReleaseWhileOffline(t *testing.T) {
+	c := New()
+	defer c.Close()
+	if !c.beginUpdateCheck() || c.beginUpdateCheck() {
+		t.Fatal("concurrent release checks should be coalesced")
+	}
+	known := &Update{Version: "v9.0.0", URL: "https://example.test/release"}
+	c.finishUpdateCheck(func(context.Context) (*Update, error) { return known, nil })
+	if !c.beginUpdateCheck() || c.finishUpdateCheck(func(context.Context) (*Update, error) {
+		return nil, errors.New("offline")
+	}) {
+		t.Fatal("failed runtime check should be eligible for an earlier retry")
+	}
+	if s := c.Snapshot(); s.UpdateStatus != "failed" || s.Update == nil || *s.Update != *known {
+		t.Fatal("offline check erased a previously discovered release")
+	}
+}

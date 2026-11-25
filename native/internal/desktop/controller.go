@@ -16,7 +16,7 @@ import (
 	"github.com/Watertube-bilibili/wxfilehelper-desktop/native/internal/wechat"
 )
 
-const Version = "1.2.0"
+const Version = "1.2.2"
 
 const (
 	maxAccounts = 2
@@ -355,7 +355,7 @@ func (c *Controller) sync(id uint64, s *session) {
 			if !c.change(id, s, func(a *account) {
 				a.Status = "online"
 				for _, message := range messages {
-					appendMessage(a, message)
+					appendMessage(a, message, true)
 				}
 			}) {
 				return
@@ -379,14 +379,40 @@ func pause(ctx context.Context, delay time.Duration) bool {
 	}
 }
 
-func appendMessage(a *account, message wechat.Message) {
+func hasServerID(m wechat.Message, id string) bool {
+	return id != "" && (id == m.ID || id == m.AlternateID)
+}
+
+func appendMessage(a *account, message wechat.Message, fromSync bool) {
 	if message.ID == "" {
 		return
 	}
-	for _, old := range a.Messages {
-		if old.ID == message.ID {
-			return
+	for i := range a.Messages {
+		old := &a.Messages[i]
+		if !hasServerID(*old, message.ID) && !hasServerID(*old, message.AlternateID) &&
+			(message.ClientID == "" || message.ClientID != old.ClientID) {
+			continue
 		}
+		// Echoes and send receipts may arrive in either order. A sync record
+		// can have a newer media token or an encrypted download name.
+		other := message
+		if old.Kind == "unsupported" || (!old.CanDownload() && message.CanDownload()) ||
+			(fromSync && message.CanDownload()) {
+			other = *old
+			*old = message
+		}
+		if old.ClientID == "" {
+			old.ClientID = other.ClientID
+		}
+		if old.AlternateID == "" {
+			if other.ID != old.ID {
+				old.AlternateID = other.ID
+			} else {
+				old.AlternateID = other.AlternateID
+			}
+		}
+		old.Outgoing = old.Outgoing || other.Outgoing
+		return
 	}
 	a.Messages = append(a.Messages, message)
 	if len(a.Messages) > maxHistory {
@@ -516,7 +542,7 @@ func (c *Controller) send(id uint64, s *session, text string, files []QueuedFile
 			failure = err
 			return
 		}
-		if !c.change(id, s, func(a *account) { appendMessage(a, message) }) {
+		if !c.change(id, s, func(a *account) { appendMessage(a, message, false) }) {
 			return
 		}
 	}
@@ -538,7 +564,7 @@ func (c *Controller) send(id uint64, s *session, text string, files []QueuedFile
 			return
 		}
 		if !c.change(id, s, func(a *account) {
-			appendMessage(a, message)
+			appendMessage(a, message, false)
 			a.Files = slices.Delete(a.Files, 0, 1)
 		}) {
 			return
@@ -560,7 +586,7 @@ func (c *Controller) Download(id uint64, messageID, target string) error {
 		return errors.New("正在保存文件，请稍候 / A file is already being saved")
 	}
 	for _, message := range a.Messages {
-		if message.ID == messageID && (message.Kind == "file" || message.Kind == "image" || message.Kind == "video") {
+		if hasServerID(message, messageID) && message.CanDownload() {
 			a.Downloading, a.Error = true, ""
 			c.revision++
 			go c.download(id, a.session, message, target)

@@ -51,47 +51,54 @@ func (c *Controller) StartUpdateChecks() {
 	c.updateScheduler = true
 	c.mu.Unlock()
 	go func() {
-		if !pause(c.ctx, 3*time.Second) {
-			return
-		}
-		for {
-			c.CheckUpdate()
-			if !pause(c.ctx, 6*time.Hour) {
-				return
+		delay := 3 * time.Second
+		for pause(c.ctx, delay) {
+			delay = 6 * time.Hour
+			if c.beginUpdateCheck() && !c.finishUpdateCheck(checkRelease) {
+				delay = 15 * time.Minute
 			}
 		}
 	}()
 }
 
 func (c *Controller) CheckUpdate() {
+	if c.beginUpdateCheck() {
+		go c.finishUpdateCheck(checkRelease)
+	}
+}
+
+func (c *Controller) beginUpdateCheck() bool {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.closed || c.updateStatus == "checking" {
-		c.mu.Unlock()
-		return
+		return false
 	}
 	c.updateStatus = "checking"
 	c.revision++
-	c.mu.Unlock()
-	go func() {
-		ctx, cancel := context.WithTimeout(c.ctx, 12*time.Second)
-		defer cancel()
-		update, err := checkRelease(ctx)
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		if c.closed {
-			return
-		}
+	return true
+}
+
+func (c *Controller) finishUpdateCheck(lookup func(context.Context) (*Update, error)) bool {
+	ctx, cancel := context.WithTimeout(c.ctx, 12*time.Second)
+	defer cancel()
+	update, err := lookup(ctx)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return false
+	}
+	if err != nil {
+		c.updateStatus = "failed"
+	} else {
 		c.update = update
-		switch {
-		case err != nil:
-			c.updateStatus = "failed"
-		case update != nil:
+		if update != nil {
 			c.updateStatus = "available"
-		default:
+		} else {
 			c.updateStatus = "current"
 		}
-		c.revision++
-	}()
+	}
+	c.revision++
+	return err == nil
 }
 
 func checkRelease(ctx context.Context) (*Update, error) {
