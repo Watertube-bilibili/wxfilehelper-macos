@@ -32,7 +32,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
 @property(strong) WXSurface *root;
 @property(strong) NSVisualEffectView *rail;
 @property(strong) NSTextField *railTitle, *status, *hint, *progressLabel, *queueLabel;
-@property(strong) NSButton *chats, *files, *updates, *release, *plus, *classMode, *refreshQR, *attach, *send, *save, *remove, *stop;
+@property(strong) NSButton *chats, *files, *updates, *releaseButton, *plus, *classMode, *refreshQR, *attach, *send, *save, *remove, *stop;
 @property(strong) NSSegmentedControl *tabs, *filter;
 @property(strong) NSPopUpButton *accountMenu;
 @property(strong) NSImageView *qr;
@@ -95,8 +95,9 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     [file addItemWithTitle:@"另存为 / Save As…" action:@selector(saveSelected:) keyEquivalent:@"s"].target = self;
     [file addItem:NSMenuItem.separatorItem];
     [file addItemWithTitle:@"添加账号 / Add Account" action:@selector(addTab:) keyEquivalent:@"t"].target = self;
-    [file addItemWithTitle:@"切换账号 / Switch Account" action:@selector(nextTab:) keyEquivalent:@"\t"].target = self;
-    file.lastItem.keyEquivalentModifierMask = NSEventModifierFlagControl;
+    NSMenuItem *switchAccount = [file addItemWithTitle:@"切换账号 / Switch Account" action:@selector(nextTab:) keyEquivalent:@"\t"];
+    switchAccount.target = self;
+    switchAccount.keyEquivalentModifierMask = NSEventModifierFlagControl;
     [bar addItemWithTitle:@"编辑 / Edit" action:nil keyEquivalent:@""].submenu = edit;
     [edit addItemWithTitle:@"撤销 / Undo" action:@selector(undo:) keyEquivalent:@"z"];
     [edit addItemWithTitle:@"剪切 / Cut" action:@selector(cut:) keyEquivalent:@"x"];
@@ -122,7 +123,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.rail = [NSVisualEffectView new]; self.rail.material = NSVisualEffectMaterialSidebar; self.rail.blendingMode = NSVisualEffectBlendingModeBehindWindow;
     self.railTitle = WXLabel(@"文件传输助手",17,NSColor.labelColor); self.railTitle.font = [NSFont boldSystemFontOfSize:17];
     self.chats = WXButton(@"文件传输",self,@selector(showChats:)); self.files = WXButton(@"本次文件",self,@selector(showFiles:));
-    self.updates = WXButton(@"检查更新",self,@selector(checkUpdate:)); self.release = WXButton(@"查看新版本",self,@selector(openRelease:));
+    self.updates = WXButton(@"检查更新",self,@selector(checkUpdate:)); self.releaseButton = WXButton(@"查看新版本",self,@selector(openRelease:));
     self.tabs = [[NSSegmentedControl alloc] initWithFrame:NSZeroRect]; self.tabs.segmentStyle = NSSegmentStyleRounded;
     self.tabs.target = self; self.tabs.action = @selector(selectTab:); self.tabs.trackingMode = NSSegmentSwitchTrackingSelectOne;
     self.plus = WXButton(@"+",self,@selector(addTab:)); self.plus.toolTip = @"添加第二个账号 / Add another account";
@@ -132,7 +133,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
         [self.accountMenu addItemWithTitle:p[0]]; self.accountMenu.lastItem.target = self; self.accountMenu.lastItem.action = NSSelectorFromString(p[1]);
     }
     self.status = WXLabel(@"",13,NSColor.secondaryLabelColor);
-    self.filter = [NSSegmentedControl segmentedControlWithLabels:@[@"全部",@"文件"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(setFilter:)];
+    self.filter = [NSSegmentedControl segmentedControlWithLabels:@[@"全部",@"文件"] trackingMode:NSSegmentSwitchTrackingSelectOne target:self action:@selector(changeFilter:)];
     self.qr = [NSImageView new]; self.qr.imageScaling = NSImageScaleProportionallyUpOrDown;
     [self.qr setAccessibilityLabel:@"微信登录二维码 / WeChat sign-in QR code"];
     self.hint = WXLabel(@"",15,NSColor.labelColor); self.hint.alignment = NSTextAlignmentCenter; self.hint.usesSingleLineMode = NO;
@@ -152,7 +153,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.stop = WXButton(@"当前文件后停止",self,@selector(stopSending:));
     self.progress = [NSProgressIndicator new]; self.progress.indeterminate = YES; self.progress.style = NSProgressIndicatorStyleBar;
     self.progressLabel = WXLabel(@"",11,NSColor.secondaryLabelColor);
-    for (NSView *v in @[self.rail,self.railTitle,self.chats,self.files,self.updates,self.release,self.tabs,self.plus,self.classMode,self.accountMenu,self.status,self.filter,self.qr,self.hint,self.refreshQR,self.historyPane,self.queueLabel,self.remove,self.queuePane,self.draftPane,self.attach,self.save,self.send,self.stop,self.progress,self.progressLabel]) [self.root addSubview:v];
+    for (NSView *v in @[self.rail,self.railTitle,self.chats,self.files,self.updates,self.releaseButton,self.tabs,self.plus,self.classMode,self.accountMenu,self.status,self.filter,self.qr,self.hint,self.refreshQR,self.historyPane,self.queueLabel,self.remove,self.queuePane,self.draftPane,self.attach,self.save,self.send,self.stop,self.progress,self.progressLabel]) [self.root addSubview:v];
     [self installMenus]; [self.window center]; [self render:YES];
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -288,8 +289,8 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.rail.frame = WXRect(0,0,rail,height); self.railTitle.frame = WXRect(18,23,136,24);
     self.chats.frame = WXRect(10,69,148,32); self.files.frame = WXRect(10,108,148,32);
     self.updates.frame = WXRect(10,height-43,148,30);
-    self.release.hidden = !sidebar || ![self.state[@"Update"] isKindOfClass:NSDictionary.class];
-    self.release.frame = WXRect(10,height-78,148,30);
+    self.releaseButton.hidden = !sidebar || ![self.state[@"Update"] isKindOfClass:NSDictionary.class];
+    self.releaseButton.frame = WXRect(10,height-78,148,30);
     self.classMode.title = big ? @"退出大屏" : @"教室大屏";
     self.classMode.frame = WXRect(width-pad-152,10,85,ctl);
     self.accountMenu.frame = WXRect(width-pad-67,10,67,ctl);
@@ -378,7 +379,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
 }
 - (void)showChats:(id)sender { self.fileOnly = NO; [self render:YES]; }
 - (void)showFiles:(id)sender { self.fileOnly = YES; [self render:YES]; }
-- (void)setFilter:(id)sender { self.fileOnly = self.filter.selectedSegment == 1; [self render:YES]; }
+- (void)changeFilter:(id)sender { self.fileOnly = self.filter.selectedSegment == 1; [self render:YES]; }
 - (void)selectTab:(id)sender {
     NSInteger i = self.tabs.selectedSegment; NSArray *accounts = WXList(self.state[@"Accounts"]);
     if (i >= 0 && i < (NSInteger)accounts.count) [self command:"select" for:accounts[i][@"ID"] value:nil extra:nil index:0];
@@ -504,7 +505,7 @@ int wxRunMac(int smoke) {
             [delegate updateButtons];
             if (delegate.qr.hidden == NO || delegate.queuePane.hidden || delegate.rows.count != 1 || !delegate.send.enabled || !delegate.save.enabled) return 1;
             if ([[delegate.tabs labelForSegment:0] containsString:@"Smoke test"]) return 1;
-            puts("OK"); return 0;
+            return 0;
         }
         app.delegate = delegate; [app run]; return 0;
     }

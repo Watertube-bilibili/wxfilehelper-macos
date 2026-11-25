@@ -41,6 +41,9 @@ func main() {
 	}
 	code := int(C.wxRunMac(smoke))
 	wxShutdown()
+	if smoke != 0 && code == 0 {
+		fmt.Println("OK")
+	}
 	os.Exit(code)
 }
 
