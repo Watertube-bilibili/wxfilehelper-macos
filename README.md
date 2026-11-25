@@ -4,24 +4,36 @@
 
 ## 中文
 
-独立的微信文件传输助手。1.2 采用原生 AppKit 界面和 Go 传输核心，双账号分别在手机微信扫码授权。可在会话中收发文字和文件，单项上限 25 MiB。选择、拖入文件或使用原生「另存为」对话框。教室模式支持大字号、全屏和隐藏昵称。更新检查只链接到 GitHub 发布页。
+在手机微信和 Mac 之间收发文字、文件和课件。这个独立客户端使用原生 AppKit 窗口和 Go 传输核心，支持两个分别扫码授权的账号。每个标签都有自己的会话、草稿和待发文件。
 
-需要 **macOS 14 或更新版本**。Apple 芯片选择 `arm64.dmg`，Intel 芯片选择 `x86_64.dmg`。打开磁盘映像，将 `WXFileHelper.app` 拖入「应用程序」。安装包使用临时签名，尚未经过 Apple 公证。
+**安装**　需要 macOS 14 或更新版本。Apple 芯片下载文件名以 `-macOS-arm64.dmg` 结尾的磁盘映像，Intel 芯片选择 `-macOS-x86_64.dmg`。打开映像，将 `WXFileHelper.app` 拖入「应用程序」。发布页附有 SHA-256 校验清单。应用采用临时签名，尚未取得 Apple 公证。[下载](https://github.com/Watertube-bilibili/wxfilehelper-macos/releases)
 
-### 构建
+**收发文件**
 
-安装 Go 1.26 和 Xcode 命令行工具，在对应架构的 Mac 运行 `bash native/packaging/macos/build.sh`。脚本执行测试、构建 `.app`、验证签名和 DMG 并检查两个位置的启动。生成文件在 `dist/`。
+1. 打开应用，用手机微信扫码并确认登录。要添加第二个账号，点标签旁的 `+`，用另一个账号扫码。
+2. 从 Mac 发送时，点「添加文件」或将文件拖入窗口，核对当前标签和待发列表后点「发送」。每个待发文件支持 1 字节至 25 MiB。
+3. 从手机发送时，在微信里把文件发到「文件传输助手」。在 Mac 的对应标签中选中附件，点「另存为」，或双击附件后选择保存位置。若微信未提供下载信息，可在手机上重新发送原文件。
 
-会话票据和消息仅保存在内存中。每个账号须自行扫码。服务条款、网络与账号条件可能影响可用性。项目依 AGPL-3.0-only 发布，与腾讯和微信无隶属关系。[免责声明](DISCLAIMER.md) · [许可证](LICENSE) · [Windows 版](https://github.com/Watertube-bilibili/wxfilehelper-desktop)
+窄窗口会收起侧栏，仍可在会话中筛选文件。应用运行期间会自动检查此 macOS 仓库的新版，也可在菜单中手动检查，然后前往发布页下载。会话票据和消息仅保存在内存中，已保存到磁盘的文件由你管理。
+
+**从源码构建**　安装 Go 1.26 和 Xcode 命令行工具，在目标架构的 Mac 上运行 `bash native/packaging/macos/build.sh`。脚本会运行 Go 测试，启动构建出的应用及 DMG 内的副本，验证签名和映像，最后将 DMG 和校验清单写入 `dist/`。
+
+项目按 AGPL-3.0-only 开源，与腾讯和微信无隶属关系。[许可证](LICENSE) · [免责声明](DISCLAIMER.md) · [Windows 版](https://github.com/Watertube-bilibili/wxfilehelper-desktop)
 
 ## English
 
-Independent WeChat File Transfer app. Version 1.2 pairs a native AppKit interface with a Go transfer core. Each account has its own QR authorization and file queue. Send text and files up to 25 MiB, drag files into the window, and save transfers with the native Save panel. Classroom mode uses larger controls and hides account names. Update checks link to the GitHub release.
+Transfer text, files and presentations between WeChat on your phone and your Mac. This independent client uses native AppKit windows and a Go transfer core. Two accounts can be authorized separately, each with its own tab, history, draft and upload queue.
 
-Requires **macOS 14 or later**. Download the `arm64.dmg` for Apple silicon or `x86_64.dmg` for Intel. Open the disk image and move `WXFileHelper.app` into Applications. The app uses an ad hoc signature and is pending Apple notarization.
+**Install.** Requires macOS 14 or later. For Apple silicon, choose the disk image ending in `-macOS-arm64.dmg`. For Intel, choose `-macOS-x86_64.dmg`. Open the image and drag `WXFileHelper.app` into Applications. The release includes SHA-256 checksums. The app is ad hoc signed and has not been notarized by Apple. [Downloads](https://github.com/Watertube-bilibili/wxfilehelper-macos/releases)
 
-### Build
+**Send and receive files**
 
-Install Go 1.26 and the Xcode command line tools. On the target Mac architecture run `bash native/packaging/macos/build.sh`. The script runs tests, validates the signed app bundle and DMG, and starts the app from both locations. Outputs are in `dist/`.
+1. Open the app, scan the QR code with WeChat on your phone, and confirm sign-in. To add a second account, click `+` beside the tab and scan with the other account.
+2. To send from your Mac, choose Add Files or drag files into the window. Check the active tab and queue, then click Send. Each outgoing file may be from 1 byte to 25 MiB.
+3. To receive from your phone, send the original file to WeChat’s File Transfer conversation. In the matching Mac tab, select the attachment and choose Save As, or double-click it and choose a destination. If WeChat supplies no download details, send the original file again from the phone.
 
-Session credentials and messages stay in memory. Each account requires its own authorization. Service rules, connectivity and account eligibility may affect availability. Licensed under AGPL-3.0-only and unaffiliated with Tencent and WeChat. [Disclaimer](DISCLAIMER.md) · [License](LICENSE) · [Windows edition](https://github.com/Watertube-bilibili/wxfilehelper-desktop)
+The sidebar folds away in a small window. The file filter remains available in the conversation. While running, the app checks this macOS repository for updates. You can also check manually from the menu, then open the release page to download an update. Session credentials and messages stay in memory. Files you save to disk stay at the destination you choose.
+
+**Build from source.** Install Go 1.26 and the Xcode command line tools. On a Mac of the target architecture, run `bash native/packaging/macos/build.sh`. The script runs the Go tests, starts both the built app and the copy mounted from the DMG, verifies the signature and disk image, and writes the DMG and checksums to `dist/`.
+
+Licensed under AGPL-3.0-only. This is an independent project unaffiliated with Tencent or WeChat. [License](LICENSE) · [Disclaimer](DISCLAIMER.md) · [Windows edition](https://github.com/Watertube-bilibili/wxfilehelper-desktop)
