@@ -1,13 +1,15 @@
-# v0.2.0-beta.2 · macOS 双账号预览版 / Dual-account macOS preview
+# 1.2.0 · macOS 原生预览 / Native macOS preview
 
 ## 中文
 
-恢复左侧会话导航，双账号标签放在对话区顶部。原生 Qt 文件传输助手，双账号分别扫码登录。支持拖放、批量发送、当前项进度、失败保留、原生保存对话框和教室大屏。更新检查指向 macOS 独立仓库。
+macOS 版改用 AppKit 和 Go，采用原生窗口、标签页和文件选择器。支持两个独立扫码授权的账号、大屏和 GitHub 更新检查。每个文件上限 25 MiB。
 
-Apple Silicon 请选择 `arm64`，Intel 请选择 `x86_64`。从镜像打开应用或拖到「应用程序」文件夹。使用附带的 SHA-256 清单核对下载。构建目标为 macOS 14 及以上，预览包未经过 Apple 公证。真实双账号文件互传和课堂触摸设备仍待实测。[双语免责声明](DISCLAIMER.md)
+macOS 14 及以上。Apple 芯片下载 `arm64.dmg`，Intel 芯片下载 `x86_64.dmg`。可用 `SHA256SUMS.txt` 校验文件。应用使用临时签名，尚未经过 Apple 公证。真实账号的扫码确认和文件互传仍待实测。
 
 ## English
 
-The classic sidebar returns with account tabs above the conversation. Native Qt File Transfer with independent QR sign-in for two accounts. Supports drag and drop, batch queues, per-item progress, retained unsent items, native save dialogs and classroom mode. Update checks point to the macOS repository.
+This version uses AppKit and Go. It includes native windows, account tabs and file panels, two independent QR sessions, classroom mode and GitHub update checks. The per-file limit is 25 MiB.
 
-Choose `arm64` for Apple Silicon or `x86_64` for Intel. Open the app from the disk image or drag it to Applications. Verify downloads with the SHA-256 manifest. Targets macOS 14 and later. These previews are not notarized by Apple. Live dual-account file transfers and physical classroom touchscreens remain unverified. [Bilingual disclaimer](DISCLAIMER.md)
+Requires macOS 14 or later. Download `arm64.dmg` for Apple silicon or `x86_64.dmg` for Intel. Verify the download with `SHA256SUMS.txt`. The app uses an ad hoc signature and is pending Apple notarization. Live account sign-in and file transfer still need end-to-end testing.
+
+[免责声明 / Disclaimer](https://github.com/Watertube-bilibili/wxfilehelper-macos/blob/main/DISCLAIMER.md) · [Windows 版 / Windows edition](https://github.com/Watertube-bilibili/wxfilehelper-desktop)
