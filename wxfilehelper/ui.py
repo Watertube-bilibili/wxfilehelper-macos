@@ -1,7 +1,6 @@
 """Main window and account tabs. SPDX-License-Identifier: AGPL-3.0-only."""
 from __future__ import annotations
 
-import re
 import sys
 from html import escape
 
@@ -83,10 +82,7 @@ class MainWindow(QMainWindow):
         self.auto_connect = auto_connect
         self.accounts: list[AccountPane] = []
         self.closing = False
-        self.classroom = False
-        self.was_maximized = False
         self.has_rail = False
-        self.display_scale = 1.0
         self.update_task = None
         self.update_result = None
         self.update_status = "updates"
@@ -152,9 +148,6 @@ class MainWindow(QMainWindow):
         title_block.addWidget(self.heading)
         title_block.addWidget(self.account_status)
         title.addLayout(title_block, 1)
-        self.classroom_button = QPushButton(objectName="Quiet")
-        self.classroom_button.clicked.connect(self._toggle_classroom)
-        title.addWidget(self.classroom_button)
         self.language_button = QPushButton(objectName="Quiet")
         self.language_button.clicked.connect(self._toggle_language)
         title.addWidget(self.language_button)
@@ -237,8 +230,6 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Meta+Tab" if sys.platform == "darwin" else "Ctrl+Tab"), self, activated=self._next_tab)
         QShortcut(QKeySequence("Ctrl+1"), self, activated=lambda: self.tabs.setCurrentIndex(0))
         QShortcut(QKeySequence("Ctrl+2"), self, activated=lambda: self.tabs.setCurrentIndex(1))
-        QShortcut(QKeySequence("F11"), self, activated=self._toggle_classroom)
-        QShortcut(QKeySequence("Escape"), self, activated=self._leave_classroom)
 
     def add_account(self):
         if self.closing or len(self.accounts) >= 2:
@@ -281,7 +272,7 @@ class MainWindow(QMainWindow):
         self._update_tabs()
 
     def _close_tab(self, index):
-        if self.closing or self.classroom or len(self.accounts) < 2 or not 0 <= index < len(self.accounts):
+        if self.closing or len(self.accounts) < 2 or not 0 <= index < len(self.accounts):
             return
         pane = self.accounts[index]
         if not pane.stop_action and pane.confirm_end():
@@ -299,7 +290,7 @@ class MainWindow(QMainWindow):
         self._quit_when_ready()
 
     def _update_tabs(self):
-        closable = len(self.accounts) > 1 and not self.classroom and not self.closing
+        closable = len(self.accounts) > 1 and not self.closing
         self.add_button.setVisible(len(self.accounts) < 2 and not self.closing)
         font = self.tabs.font()
         font.setBold(True)
@@ -308,7 +299,7 @@ class MainWindow(QMainWindow):
         max_width = min(238, tab_space // max(len(self.accounts), 1))
         for index, pane in enumerate(self.accounts):
             account = self.t("account").format(n=pane.number)
-            name = pane.nickname if pane.nickname and not self.classroom else account
+            name = pane.nickname or account
             number = (" · " + str(pane.number)) if name != account else ""
             badge = ("  (" + ("99+" if pane.unread > 99 else str(pane.unread)) + ")") if pane.unread else ""
             suffix = number + badge
@@ -346,7 +337,6 @@ class MainWindow(QMainWindow):
         self.tabs.setAccessibleName(self.t("title"))
         self.add_button.setToolTip(self.t("add_account"))
         self.add_button.setAccessibleName(self.t("add_account"))
-        self.classroom_button.setText(self.t("exit_classroom" if self.classroom else "classroom"))
         self.menu_button.setToolTip(self.t("menu"))
         self.menu_button.setAccessibleName(self.t("menu"))
         self.rail_chat.setText(self.t("chat"))
@@ -387,49 +377,15 @@ class MainWindow(QMainWindow):
 
     def _adapt_display(self):
         height, width = self.height(), self.width()
-        self.has_rail = width >= 900 and height >= 510 and not self.classroom
+        self.has_rail = width >= 900 and height >= 510
         self.rail.setVisible(self.has_rail)
         self.compact_icon.setVisible(not self.has_rail)
-        self.menu_button.setVisible(not self.has_rail and not self.classroom)
+        self.menu_button.setVisible(not self.has_rail)
         self.language_button.setVisible(self.has_rail)
         content_width = width - self.rail.width() if self.has_rail else width
-        scale = (1.6 if height >= 900 else 1.34 if height >= 700 else 1.15) if self.classroom else 1.0
-        if scale != self.display_scale:
-            self.display_scale = scale
-            style = re.sub(r"font-size: (\d+)px", lambda m: f"font-size: {round(int(m[1]) * scale)}px", STYLE)
-            if self.classroom:
-                style += """
-QPushButton, QPushButton#Quiet, QPushButton#Filter, QPushButton#Inline { min-height: 34px; padding: 7px 10px; }
-QTabBar::tab { min-height: 34px; }
-QScrollBar:vertical { width: 16px; }
-"""
-            self.setStyleSheet(style)
         for pane in self.accounts:
-            pane.set_display(content_width, height, self.classroom, inline_nav=not self.has_rail)
+            pane.set_display(content_width, height, inline_nav=not self.has_rail)
         self._update_tabs()
-
-    def _toggle_classroom(self):
-        if self.classroom:
-            self._leave_classroom()
-            return
-        self.was_maximized = self.isMaximized()
-        self.classroom = True
-        self.showFullScreen()
-        self.menu_button.hide()
-        self.classroom_button.setText(self.t("exit_classroom"))
-        self._adapt_display()
-
-    def _leave_classroom(self):
-        if not self.classroom:
-            return
-        self.classroom = False
-        if self.was_maximized:
-            self.showMaximized()
-        else:
-            self.showNormal()
-        self.menu_button.show()
-        self.classroom_button.setText(self.t("classroom"))
-        self._adapt_display()
 
     def _check_update(self):
         if self.update_task or self.closing:
@@ -480,10 +436,7 @@ QScrollBar:vertical { width: 16px; }
 
     def _show(self):
         if not self.closing:
-            if self.classroom:
-                self.showFullScreen()
-            else:
-                self.show()
+            self.show()
             self.raise_()
             self.activateWindow()
 

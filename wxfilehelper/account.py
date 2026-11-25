@@ -61,7 +61,6 @@ class AccountPane(QWidget):
         self.rows: dict[str, tuple[Message, QWidget]] = {}
         self.unread = 0
         self.selected = False
-        self.classroom = False
         self.inline_nav = True
         self.queue_rows = 2
         self.files_only = False
@@ -232,24 +231,20 @@ class AccountPane(QWidget):
         if redraw:
             self._invalidate_rows()
 
-    def set_display(self, width, height, classroom, *, inline_nav=True):
-        redraw = classroom != self.classroom
-        nav_changed = self.inline_nav != inline_nav or redraw
+    def set_display(self, width, height, *, inline_nav=True):
+        nav_changed = self.inline_nav != inline_nav
         self.inline_nav = inline_nav
-        self.classroom = classroom
-        padding = max(16 if width < 675 else 24, (width - (1240 if classroom else 1080)) // 2)
+        padding = max(16 if width < 675 else 24, (width - 1080) // 2)
         self.chat_layout.setContentsMargins(padding, 4, padding, 8)
-        self.composer.setFixedHeight(100 if classroom and height >= 750 else 52 if height < 500 else 78)
+        self.composer.setFixedHeight(52 if height < 500 else 78)
         self.queue_rows = 1 if height < 500 else 2 if height < 690 else 3
         self._fit_pending_list()
-        qr_size = min(372 if classroom else 224, max(150, int(height * (.36 if classroom else .34))))
+        qr_size = min(224, max(150, int(height * .34)))
         if qr_size != self.qr_label.width():
             self.qr_label.setFixedSize(qr_size, qr_size)
             self._fit_qr()
         if nav_changed:
             self._state_ui()
-        if redraw:
-            self._invalidate_rows()
 
     def select(self, selected):
         self.selected = selected
@@ -265,7 +260,7 @@ class AccountPane(QWidget):
     def _state_ui(self):
         current = self.state
         status = self.t(current)
-        if current in ("online", "reconnecting") and self.nickname and not self.classroom:
+        if current in ("online", "reconnecting") and self.nickname:
             status += " · " + self.nickname
         self.status.setText(self.t("archived") if current == "expired" and self.account_id else status)
         self.login_status.setText(self.t(current))
@@ -463,7 +458,7 @@ class AccountPane(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         bubble = QFrame(objectName="Outgoing" if message.outgoing else "Incoming")
         is_file = message.kind in FILE_KINDS
-        maximum = 740 if self.classroom else 455
+        maximum = 455
         longest = max(message.text.splitlines() or [""], key=len)
         width = self.fontMetrics().horizontalAdvance(longest) + 34
         bubble.setMaximumWidth(min(maximum, max(244 if is_file else 154, width)))

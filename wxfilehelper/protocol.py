@@ -19,10 +19,11 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, ParseError, SubElement, tostring
 
 import requests
 from defusedxml.ElementTree import fromstring
+from defusedxml.common import DefusedXmlException
 
 ROOT = "/cgi-bin/mmwebwx-bin/"
 REGIONS = {
@@ -105,26 +106,42 @@ def parse_message(raw: dict, username: str) -> Message | None:
         message.text = f"{message.kind}-{msg_id}.{extension}"
         return message
     if kind == 49:
+        app = None
         try:
             # Some servers HTML-escape the entire XML, others send literal XML.
             xml = content if content.lstrip().startswith("<") else html.unescape(content)
             root = fromstring(xml)
             app = root if root.tag == "appmsg" else root.find("appmsg")
-            if app is None:
-                raise ValueError("missing appmsg")
-            title = app.findtext("title") or raw.get("FileName") or "file"
-            if app.findtext("type") == "6":
-                message.kind = "file"
-                message.text = safe_filename(title)
-                message.media_id = app.findtext("appattach/attachid") or str(raw.get("MediaId", ""))
-                message.size = max(0, int(app.findtext("appattach/totallen") or raw.get("FileSize") or 0))
-            else:
-                message.text = title + "\n" + (app.findtext("des") or "")
-            return message
-        except Exception:
+        except (ParseError, DefusedXmlException):
+            pass
+        # A phone may supply its entire attachment descriptor in the JSON
+        # fields, with no appmsg XML in Content.
+        subtype = str(raw.get("AppMsgType") or "").strip()
+        if subtype in ("", "0"):
+            subtype = (app.findtext("type") or "").strip() if app is not None else ""
+        title = raw.get("FileName") or (app.findtext("title") if app is not None else "") or "file"
+        media_id = str(raw.get("MediaId") or "").strip()
+        if media_id == "0":
+            media_id = ""
+        if subtype == "6" or (not subtype and raw.get("FileName") and media_id):
+            message.kind = "file"
+            message.text = safe_filename(title)
+            message.media_id = media_id
+            if not message.media_id and app is not None:
+                message.media_id = app.findtext("appattach/attachid") or ""
+            for size in (raw.get("FileSize"), app.findtext("appattach/totallen") if app is not None else None):
+                try:
+                    message.size = max(0, int(size))
+                except (ValueError, TypeError):
+                    continue
+                if message.size:
+                    break
+        elif app is not None:
+            message.text = title + "\n" + (app.findtext("des") or "")
+        else:
             message.kind = "unsupported"
             message.text = "无法解析此消息，请在手机微信查看 / Open this message on your phone"
-            return message
+        return message
     if kind in (51, 10000, 10002):
         return None
     message.kind = "unsupported"

@@ -59,7 +59,6 @@ TEXT = {
     "privacy": ("消息仅保留在本次会话；下载的文件由你选择保存位置。", "Messages stay in this session. You choose where downloads are saved."),
     "quit_title": ("传输仍在进行", "Transfer in progress"),
     "quit_body": ("退出会中断当前操作。确定退出吗？", "Quitting interrupts the current operation. Quit anyway?"),
-    "classroom": ("大屏模式", "Large screen"), "exit_classroom": ("退出大屏 · Esc", "Exit full screen · Esc"),
     "updates": ("检查更新", "Check for updates"), "checking": ("正在检查更新…", "Checking for updates…"),
     "current": ("当前已是最新版本", "You are up to date"),
     "new_version": ("发现新版本 {version} · 查看更新", "Update {version} available · View release"),
