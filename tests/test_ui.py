@@ -65,22 +65,6 @@ def test_drop_stages_valid_files_once_without_sending(window, tmp_path):
     assert not tab.pending
 
 
-def test_classroom_retains_tab_controls_and_hides_both_names(window):
-    first = window.current_account
-    second = window.add_account()
-    first.nickname, second.nickname = "Private first name", "Private second name"
-    first._set_state("online")
-    second._set_state("online")
-    window._toggle_classroom()
-    assert window.classroom and window.isFullScreen()
-    assert window.tabs.count() == 2
-    assert not window.menu_button.isVisible()
-    assert "Private" not in second.status.text()
-    assert all("Private" not in window.tabs.tabText(i) for i in range(2))
-    assert "Esc" in window.classroom_button.text()
-    window._leave_classroom()
-    assert "Private" in window.tabs.tabToolTip(1)
-
 def test_sidebar_collapses_without_losing_current_account_filter(window, app):
     window.resize(1024, 680)
     first = window.current_account

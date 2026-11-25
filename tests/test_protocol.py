@@ -100,6 +100,30 @@ def test_malicious_xml_is_not_expanded():
     assert msg.kind == "unsupported"
 
 
+@pytest.mark.parametrize("content", ["", "<msg/>", "<msg><appmsg"])
+def test_phone_powerpoint_with_top_level_metadata(content):
+    msg = parse_message({"FromUserName": "@me", "ToUserName": "filehelper", "MsgId": "10",
+                         "MsgType": 49, "AppMsgType": "6", "FileName": "课件 & notes.pptx",
+                         "FileSize": "123", "MediaId": "media-1", "Content": content}, "@me")
+    assert (msg.kind, msg.text, msg.size, msg.media_id) == ("file", "课件 & notes.pptx", 123, "media-1")
+    assert not msg.outgoing
+
+
+def test_file_with_only_encrypted_filename_has_no_download_id():
+    msg = parse_message({"FromUserName": "@me", "ToUserName": "filehelper", "MsgId": "10",
+                         "MsgType": 49, "AppMsgType": 6, "FileName": "课件.pptx",
+                         "EncryFileName": "name.pptx", "Content": ""}, "@me")
+    assert (msg.kind, msg.text, msg.media_id) == ("file", "课件.pptx", "")
+
+
+def test_link_named_pptx_is_not_an_attachment():
+    msg = parse_message({"FromUserName": "@me", "ToUserName": "filehelper", "MsgId": "10",
+                         "MsgType": 49, "AppMsgType": 5, "FileName": "共享.pptx", "MediaId": "thumb",
+                         "Content": "<msg><appmsg><title>共享.pptx</title><type>5</type></appmsg></msg>"}, "@me")
+    assert msg.kind == "text"
+    assert not msg.media_id
+
+
 def test_sync_updates_keys_even_without_messages(client, monkeypatch):
     client.sync_key = {"Count": 1, "List": [{"Key": 1, "Val": 2}]}
     client.check_key = client.sync_key
