@@ -210,6 +210,7 @@ func (c *Client) Sync(ctx context.Context) ([]Message, error) {
 		}
 		for _, raw := range r.AddMsgList {
 			if msg, ok := raw.message(); ok {
+				c.markLocalEcho(&msg, raw, s)
 				messages = append(messages, msg)
 			}
 		}

@@ -74,6 +74,8 @@ type Client struct {
 	s             *session
 	key, checkKey syncKey
 	sequence      atomic.Int64
+	sent          [320]sendReceipt
+	nextSent      int
 }
 
 // Discard all cookies at sign-out, including Path/Domain variations and late
@@ -121,6 +123,7 @@ func (c *Client) Close() {
 	c.mu.Lock()
 	c.s = nil
 	c.key, c.checkKey = syncKey{}, syncKey{}
+	clear(c.sent[:])
 	c.mu.Unlock()
 	c.loginMu.Lock()
 	c.uuid = ""

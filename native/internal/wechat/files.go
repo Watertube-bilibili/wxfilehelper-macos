@@ -30,9 +30,9 @@ var errChanged = errors.New("文件在发送时发生变化，请保存后重试
 var errIncomplete = errors.New("下载不完整，请重试 / Incomplete download")
 var wholeRange = regexp.MustCompile(`^bytes 0-([0-9]+)/([0-9]+)$`)
 
-func (c *Client) dataTicket(s *session) string {
+func (c *Client) dataTicket(s *session, endpoint string) string {
 	for _, host := range []string{regions[s.host].file, s.host} {
-		for _, cookie := range c.jar.Cookies(serviceURL(host, root, "webwxuploadmedia")) {
+		for _, cookie := range c.jar.Cookies(serviceURL(host, root, endpoint)) {
 			if cookie.Name == "webwx_data_ticket" && cookie.Value != "" {
 				return cookie.Value
 			}
@@ -46,7 +46,7 @@ func (c *Client) SendFile(ctx context.Context, path string, progress func(sent, 
 	if err != nil {
 		return Message{}, err
 	}
-	ticket := c.dataTicket(s)
+	ticket := c.dataTicket(s, "webwxuploadmedia")
 	if ticket == "" {
 		return Message{}, ErrSessionExpired
 	}
@@ -132,14 +132,14 @@ func (c *Client) SendFile(ctx context.Context, path string, progress func(sent, 
 	if err != nil {
 		return Message{}, err
 	}
-	id, err := c.send(ctx, s, 6, "webwxsendappmsg", body)
+	receipt, err := c.send(ctx, s, 6, "webwxsendappmsg", body)
 	if err != nil {
 		return Message{}, err
 	}
 	if progress != nil {
 		progress(size, size)
 	}
-	return Message{ID: id, Kind: "file", Text: name, Outgoing: true, Timestamp: time.Now().Unix(), Size: size, MediaID: media, Sender: s.username}, nil
+	return Message{ID: receipt.server, ClientID: receipt.local, Kind: "file", Text: name, Outgoing: true, Timestamp: time.Now().Unix(), Size: size, MediaID: media, Sender: s.username}, nil
 }
 
 func unchanged(f *os.File, initial os.FileInfo) bool {
@@ -189,16 +189,30 @@ func (c *Client) Download(ctx context.Context, msg Message, target string) error
 	var endpoint string
 	switch msg.Kind {
 	case "file":
-		if msg.MediaID == "" {
+		if !msg.CanDownload() {
 			return errors.New("文件已不可用，请从手机重新发送 / File no longer available")
 		}
 		host = regions[s.host].file
 		endpoint = "webwxgetmedia"
 		q.Set("sender", msg.Sender)
 		q.Set("mediaid", msg.MediaID)
-		q.Set("filename", msg.Text)
+		if msg.encryptedName != "" {
+			q.Set("encryfilename", msg.encryptedName)
+		} else {
+			name := msg.downloadName
+			if name == "" {
+				name = msg.Text
+			}
+			q.Set("filename", name)
+		}
 		q.Set("fromuser", s.uin)
-		q.Set("webwx_data_ticket", c.dataTicket(s))
+		ticket := c.dataTicket(s, endpoint)
+		if ticket == "" {
+			return errors.New("缺少文件下载授权，请重新扫码 / Scan again to authorize downloading files")
+		}
+		q.Set("webwx_data_ticket", ticket)
+		q.Set("sid", s.sid)
+		q.Set("mmweb_appid", "wx_webfilehelper")
 	case "image", "video", "voice":
 		endpoint = map[string]string{"image": "webwxgetmsgimg", "video": "webwxgetvideo", "voice": "webwxgetvoice"}[msg.Kind]
 		q.Set("MsgID", msg.ID)
@@ -231,12 +245,6 @@ func (c *Client) Download(ctx context.Context, msg Message, target string) error
 		}
 		expected = total
 	}
-	if msg.Kind == "file" && msg.Size > 0 {
-		if expected >= 0 && expected != msg.Size {
-			return errIncomplete
-		}
-		expected = msg.Size
-	}
 	// A small complete JSON/XML protocol error can also be sent with HTTP 200.
 	// Only inspect complete small bodies, so user HTML, XML and JSON survive.
 	head, err := io.ReadAll(io.LimitReader(r.Body, 64<<10))
@@ -252,6 +260,12 @@ func (c *Client) Download(ctx context.Context, msg Message, target string) error
 	}
 	if n < 64<<10 && serviceError(head) {
 		return errors.New("文件已过期或微信拒绝下载 / File expired or service rejected download")
+	}
+	if msg.Kind == "file" && msg.Size > 0 {
+		if expected >= 0 && expected != msg.Size {
+			return errIncomplete
+		}
+		expected = msg.Size
 	}
 	f, err := os.CreateTemp(filepath.Dir(target), ".wxfilehelper-*.part")
 	if err != nil {

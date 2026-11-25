@@ -97,7 +97,7 @@ func TestQRAndRegionalLogin(t *testing.T) {
 	if id, name := c.Identity(); id != "123" || name != "A & B" {
 		t.Fatal(id, name)
 	}
-	if ticket := c.dataTicket(c.s); ticket != "test" {
+	if ticket := c.dataTicket(c.s, "webwxgetmedia"); ticket != "test" {
 		t.Fatal(ticket)
 	}
 	c.Close()
