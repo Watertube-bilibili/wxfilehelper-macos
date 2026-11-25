@@ -56,7 +56,28 @@ func wxSnapshot(seen C.ulonglong, force C.int) *C.char {
 	if force == 0 && s.Revision == uint64(seen) {
 		return nil
 	}
-	data, err := json.Marshal(s)
+	// Only pass the fields AppKit displays. Download credentials stay in Go.
+	type messageRow struct {
+		ID, Kind, Text    string
+		Outgoing, CanSave bool
+		Timestamp, Size   int64
+	}
+	type accountView struct {
+		desktop.Account
+		Messages []messageRow
+	}
+	view := struct {
+		desktop.Snapshot
+		Accounts []accountView
+	}{Snapshot: s}
+	for _, account := range s.Accounts {
+		rows := make([]messageRow, 0, len(account.Messages))
+		for _, m := range account.Messages {
+			rows = append(rows, messageRow{m.ID, m.Kind, m.Text, m.Outgoing, m.CanDownload(), m.Timestamp, m.Size})
+		}
+		view.Accounts = append(view.Accounts, accountView{account, rows})
+	}
+	data, err := json.Marshal(view)
 	if err != nil {
 		return nil
 	}

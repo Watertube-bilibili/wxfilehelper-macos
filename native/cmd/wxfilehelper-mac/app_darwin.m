@@ -32,7 +32,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
 @property(strong) WXSurface *root;
 @property(strong) NSVisualEffectView *rail;
 @property(strong) NSTextField *railTitle, *status, *hint, *progressLabel, *queueLabel;
-@property(strong) NSButton *chats, *files, *updates, *releaseButton, *plus, *classMode, *refreshQR, *attach, *send, *save, *remove, *stop;
+@property(strong) NSButton *chats, *files, *updates, *releaseButton, *plus, *refreshQR, *attach, *send, *save, *remove, *stop;
 @property(strong) NSSegmentedControl *tabs, *filter;
 @property(strong) NSPopUpButton *accountMenu;
 @property(strong) NSImageView *qr;
@@ -49,7 +49,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
 @property(strong) NSNumber *active;
 @property(strong) NSString *qrSource;
 @property(strong) NSDateFormatter *timeFormat;
-@property BOOL classOn, fileOnly, smoke;
+@property BOOL fileOnly, smoke;
 @property unsigned long long revision;
 - (void)layout;
 - (void)render:(BOOL)force;
@@ -83,7 +83,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     pane.documentView = table; return pane;
 }
 - (void)installMenus {
-    NSMenu *bar = [NSMenu new], *app = [NSMenu new], *file = [NSMenu new], *edit = [NSMenu new], *view = [NSMenu new];
+    NSMenu *bar = [NSMenu new], *app = [NSMenu new], *file = [NSMenu new], *edit = [NSMenu new];
     [bar addItemWithTitle:@"" action:nil keyEquivalent:@""].submenu = app;
     [app addItemWithTitle:@"关于文件传输助手 / About" action:@selector(about:) keyEquivalent:@""].target = self;
     [app addItemWithTitle:@"检查更新 / Check for Updates" action:@selector(checkUpdate:) keyEquivalent:@""].target = self;
@@ -104,9 +104,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     [edit addItemWithTitle:@"复制 / Copy" action:@selector(copy:) keyEquivalent:@"c"];
     [edit addItemWithTitle:@"粘贴 / Paste" action:@selector(paste:) keyEquivalent:@"v"];
     [edit addItemWithTitle:@"全选 / Select All" action:@selector(selectAll:) keyEquivalent:@"a"];
-    [bar addItemWithTitle:@"显示 / View" action:nil keyEquivalent:@""].submenu = view;
-    NSMenuItem *mode = [view addItemWithTitle:@"教室大屏 / Classroom" action:@selector(classroom:) keyEquivalent:[NSString stringWithFormat:@"%C",(unichar)NSF11FunctionKey]];
-    mode.keyEquivalentModifierMask = 0; mode.target = self; NSApp.mainMenu = bar;
+    NSApp.mainMenu = bar;
 }
 - (void)buildWindow {
     self.state = @{}; self.account = @{}; self.rows = @[]; self.staged = @[];
@@ -127,7 +125,6 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.tabs = [[NSSegmentedControl alloc] initWithFrame:NSZeroRect]; self.tabs.segmentStyle = NSSegmentStyleRounded;
     self.tabs.target = self; self.tabs.action = @selector(selectTab:); self.tabs.trackingMode = NSSegmentSwitchTrackingSelectOne;
     self.plus = WXButton(@"+",self,@selector(addTab:)); self.plus.toolTip = @"添加第二个账号 / Add another account";
-    self.classMode = WXButton(@"教室大屏",self,@selector(classroom:));
     self.accountMenu = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES]; [self.accountMenu addItemWithTitle:@"更多"];
     for (NSArray *p in @[@[@"检查更新 / Check Updates",@"checkUpdate:"],@[@"查看新版本 / Open Release",@"openRelease:"],@[@"退出账号 / Sign Out",@"signOut:"],@[@"关闭标签 / Close Account",@"closeTab:"],@[@"关于 / About",@"about:"]]) {
         [self.accountMenu addItemWithTitle:p[0]]; self.accountMenu.lastItem.target = self; self.accountMenu.lastItem.action = NSSelectorFromString(p[1]);
@@ -153,7 +150,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.stop = WXButton(@"当前文件后停止",self,@selector(stopSending:));
     self.progress = [NSProgressIndicator new]; self.progress.indeterminate = YES; self.progress.style = NSProgressIndicatorStyleBar;
     self.progressLabel = WXLabel(@"",11,NSColor.secondaryLabelColor);
-    for (NSView *v in @[self.rail,self.railTitle,self.chats,self.files,self.updates,self.releaseButton,self.tabs,self.plus,self.classMode,self.accountMenu,self.status,self.filter,self.qr,self.hint,self.refreshQR,self.historyPane,self.queueLabel,self.remove,self.queuePane,self.draftPane,self.attach,self.save,self.send,self.stop,self.progress,self.progressLabel]) [self.root addSubview:v];
+    for (NSView *v in @[self.rail,self.railTitle,self.chats,self.files,self.updates,self.releaseButton,self.tabs,self.plus,self.accountMenu,self.status,self.filter,self.qr,self.hint,self.refreshQR,self.historyPane,self.queueLabel,self.remove,self.queuePane,self.draftPane,self.attach,self.save,self.send,self.stop,self.progress,self.progressLabel]) [self.root addSubview:v];
     [self installMenus]; [self.window center]; [self render:YES];
 }
 - (void)applicationDidFinishLaunching:(NSNotification *)note {
@@ -175,8 +172,6 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     [self.poll invalidate]; wxShutdown(); return NSTerminateNow;
 }
 - (BOOL)windowShouldClose:(NSWindow *)sender { [NSApp terminate:self]; return NO; }
-- (void)windowDidExitFullScreen:(NSNotification *)note { self.classOn = NO; [self render:YES]; }
-- (void)cancelOperation:(id)sender { if (self.classOn) [self classroom:self]; }
 - (BOOL)command:(const char *)op for:(NSNumber *)account value:(NSString *)value extra:(NSString *)extra index:(NSInteger)index {
     NSString *error = WXAction(op,account,value,extra,index);
     if (error) {
@@ -223,7 +218,7 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
             }
             [self.pending removeObjectForKey:key];
         }
-        NSString *name = self.classOn || !online ? @"" : WXStr(a[@"Name"]);
+        NSString *name = !online ? @"" : WXStr(a[@"Name"]);
         if (name.length > 12) name = [[name substringToIndex:NSMaxRange([name rangeOfComposedCharacterSequenceAtIndex:11])] stringByAppendingString:@"…"];
         [self.tabs setLabel:name.length ? name : [NSString stringWithFormat:@"账号 %lu",(unsigned long)i+1] forSegment:i];
         if ([key isEqual:selected]) { self.account = a; self.tabs.selectedSegment = i; }
@@ -276,14 +271,14 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.send.enabled = online && !busy && (self.draft.string.length || self.staged.count);
     self.attach.enabled = online && !busy; self.draft.editable = online && !busy;
     self.remove.enabled = online && !busy && self.queue.selectedRow >= 0;
-    self.save.enabled = online && ![self.account[@"Downloading"] boolValue] && WXIsFile([self selectedMessage]);
+    self.save.enabled = online && ![self.account[@"Downloading"] boolValue] && [[[self selectedMessage] objectForKey:@"CanSave"] boolValue];
 }
 - (void)layout {
     if (!self.send) return;
     CGFloat width = NSWidth(self.root.bounds), height = NSHeight(self.root.bounds);
-    BOOL big = self.classOn, sidebar = !big && width >= 840 && height >= 500;
-    CGFloat rail = sidebar ? 168 : 0, pad = big ? 24 : 14, left = rail + pad;
-    CGFloat usable = width-left-pad, ctl = big ? 40 : 30;
+    BOOL sidebar = width >= 840 && height >= 500;
+    CGFloat rail = sidebar ? 168 : 0, pad = 14, left = rail + pad;
+    CGFloat usable = width-left-pad, ctl = 30;
     BOOL online = [self.account[@"SignedIn"] boolValue], busy = [self.account[@"Busy"] boolValue];
     for (NSView *v in @[self.rail,self.railTitle,self.chats,self.files,self.updates]) v.hidden = !sidebar;
     self.rail.frame = WXRect(0,0,rail,height); self.railTitle.frame = WXRect(18,23,136,24);
@@ -291,51 +286,49 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     self.updates.frame = WXRect(10,height-43,148,30);
     self.releaseButton.hidden = !sidebar || ![self.state[@"Update"] isKindOfClass:NSDictionary.class];
     self.releaseButton.frame = WXRect(10,height-78,148,30);
-    self.classMode.title = big ? @"退出大屏" : @"教室大屏";
-    self.classMode.frame = WXRect(width-pad-152,10,85,ctl);
     self.accountMenu.frame = WXRect(width-pad-67,10,67,ctl);
     NSUInteger count = WXList(self.state[@"Accounts"]).count;
-    CGFloat tabWidth = MIN(count == 2 ? 260 : 130,usable-204);
+    CGFloat tabWidth = MIN(count == 2 ? 260 : 130,usable-116);
     self.tabs.frame = WXRect(left,10,tabWidth,ctl); self.plus.frame = WXRect(left+tabWidth+4,10,34,ctl);
     self.plus.hidden = count >= 2;
     CGFloat statusY = 16+ctl;
     self.filter.hidden = sidebar || !online; self.filter.frame = WXRect(width-pad-106,statusY,106,26);
-    self.status.font = [NSFont systemFontOfSize:big ? 17 : 13];
-    self.status.frame = WXRect(left,statusY+3,usable-(self.filter.hidden ? 0 : 112),big ? 26 : 22);
-    CGFloat top = statusY + (big ? 40 : 32);
+    self.status.font = [NSFont systemFontOfSize:13];
+    self.status.frame = WXRect(left,statusY+3,usable-(self.filter.hidden ? 0 : 112),22);
+    CGFloat top = statusY + 32;
     self.qr.hidden = self.hint.hidden = self.refreshQR.hidden = online;
     self.historyPane.hidden = self.draftPane.hidden = self.attach.hidden = self.send.hidden = self.save.hidden = !online;
     self.queuePane.hidden = self.queueLabel.hidden = self.remove.hidden = !online || !self.staged.count;
     self.stop.hidden = self.progress.hidden = self.progressLabel.hidden = !online || !busy;
     if (!online) {
         CGFloat lower = height-top-12;
-        CGFloat qr = MIN(big ? 480 : 260,MAX(88,MIN(usable-20,lower-112)));
+        CGFloat qr = MIN(260,MAX(88,MIN(usable-20,lower-112)));
         CGFloat qy = top+MAX(0,(lower-qr-99)/2);
-        self.qr.frame = WXRect(left+(usable-qr)/2,qy,qr,qr); self.hint.font = [NSFont systemFontOfSize:big ? 23 : 15];
-        self.hint.frame = WXRect(left,qy+qr+6,usable,big ? 60 : 45);
-        self.refreshQR.frame = WXRect(left+(usable-145)/2,qy+qr+(big ? 70 : 54),145,ctl);
+        self.qr.frame = WXRect(left+(usable-qr)/2,qy,qr,qr); self.hint.font = [NSFont systemFontOfSize:15];
+        self.hint.frame = WXRect(left,qy+qr+6,usable,45);
+        self.refreshQR.frame = WXRect(left+(usable-145)/2,qy+qr+54,145,ctl);
     } else {
-        CGFloat bottom = height-pad-ctl, sendWidth = big ? 110 : 85;
+        CGFloat bottom = height-pad-ctl, sendWidth = 85;
         self.attach.frame = WXRect(left,bottom,105,ctl); self.save.frame = WXRect(left+110,bottom,88,ctl);
         self.send.frame = WXRect(width-pad-sendWidth,bottom,sendWidth,ctl);
         self.stop.frame = WXRect(width-pad-sendWidth-133,bottom,128,ctl);
-        CGFloat composerHeight = big ? 80 : height >= 540 ? 65 : 46, composerY = bottom-composerHeight-6;
+        CGFloat composerHeight = height >= 540 ? 65 : 46, composerY = bottom-composerHeight-6;
         self.draftPane.frame = WXRect(left,composerY,usable,composerHeight);
-        self.draft.font = [NSFont systemFontOfSize:big ? 20 : 14];
+        self.draft.font = [NSFont systemFontOfSize:14];
         CGFloat historyEnd = composerY-8;
         if (busy) {
             self.progress.frame = WXRect(left,historyEnd-14,MAX(100,usable-170),12);
             self.progressLabel.frame = WXRect(width-pad-157,historyEnd-17,157,17); historyEnd -= 21;
         }
         if (self.staged.count) {
-            CGFloat qh = MIN((CGFloat)self.staged.count*(big ? 34 : 26),MAX(28,MIN(110,(height-top)*0.18)));
-            self.queuePane.frame = WXRect(left,historyEnd-qh,usable,qh); self.queue.rowHeight = big ? 32 : 24;
+            CGFloat qh = MIN((CGFloat)self.staged.count*26,MAX(28,MIN(110,(height-top)*0.18)));
+            self.queuePane.frame = WXRect(left,historyEnd-qh,usable,qh); self.queue.rowHeight = 24;
             self.queueLabel.frame = WXRect(left,historyEnd-qh-24,usable-110,23);
             self.remove.frame = WXRect(width-pad-92,historyEnd-qh-26,92,26);
             historyEnd -= qh+30;
         }
         self.historyPane.frame = WXRect(left,top,usable,MAX(40,historyEnd-top));
-        self.history.rowHeight = big ? 67 : 46;
+        self.history.rowHeight = 46;
     }
     [self updateButtons];
 }
@@ -360,14 +353,14 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     NSString *body = WXStr(item[queued ? @"Name" : @"Text"]);
     if (queued) {
         cell.textField.stringValue = [NSString stringWithFormat:@"%@    %@",body,WXSize(item[@"Size"])];
-        cell.textField.font = [NSFont systemFontOfSize:self.classOn ? 18 : 13]; cell.toolTip = WXStr(item[@"Path"]);
+        cell.textField.font = [NSFont systemFontOfSize:13]; cell.toolTip = WXStr(item[@"Path"]);
     } else {
         NSString *when = [self.timeFormat stringFromDate:[NSDate dateWithTimeIntervalSince1970:[item[@"Timestamp"] doubleValue]]];
         NSString *kind = WXIsFile(item) ? [NSString stringWithFormat:@" · 文件 %@",WXSize(item[@"Size"])] : @"";
         NSString *meta = [NSString stringWithFormat:@"%@   %@%@\n",[item[@"Outgoing"] boolValue] ? @"已发送" : @"收到",when,kind];
-        NSMutableAttributedString *a = [[NSMutableAttributedString alloc] initWithString:meta attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:self.classOn ? 15 : 11],NSForegroundColorAttributeName:NSColor.secondaryLabelColor}];
+        NSMutableAttributedString *a = [[NSMutableAttributedString alloc] initWithString:meta attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:11],NSForegroundColorAttributeName:NSColor.secondaryLabelColor}];
         NSString *line = [[body componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet] componentsJoinedByString:@" "];
-        [a appendAttributedString:[[NSAttributedString alloc] initWithString:line attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:self.classOn ? 23 : 15],NSForegroundColorAttributeName:NSColor.labelColor}]];
+        [a appendAttributedString:[[NSAttributedString alloc] initWithString:line attributes:@{NSFontAttributeName:[NSFont systemFontOfSize:15],NSForegroundColorAttributeName:NSColor.labelColor}]];
         cell.textField.attributedStringValue = a; cell.toolTip = body;
     }
     return cell;
@@ -442,7 +435,14 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
 }
 - (void)openSelection:(id)sender {
     NSDictionary *msg = [self selectedMessage]; if (!msg) return;
-    if (WXIsFile(msg)) { [self saveSelected:sender]; return; }
+    if ([msg[@"CanSave"] boolValue]) { [self saveSelected:sender]; return; }
+    if (WXIsFile(msg)) {
+        NSAlert *alert = [NSAlert new];
+        alert.messageText = WXStr(msg[@"Text"]);
+        alert.informativeText = @"微信没有提供此文件的下载信息 / WeChat did not supply download details for this file.";
+        [alert beginSheetModalForWindow:self.window completionHandler:nil];
+        return;
+    }
     NSAlert *detail = [NSAlert new]; detail.messageText = [msg[@"Outgoing"] boolValue] ? @"已发送的文字" : @"收到的文字";
     NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(0,0,400,170)];
     scroll.hasVerticalScroller = YES; scroll.borderType = NSBezelBorder;
@@ -458,10 +458,6 @@ static NSRect WXRect(CGFloat x, CGFloat y, CGFloat w, CGFloat h) { return NSMake
     if ([url.scheme isEqual:@"https"] && [url.host.lowercaseString isEqual:@"github.com"] && [url.path hasPrefix:@"/Watertube-bilibili/wxfilehelper-macos/releases/"]) {
         [NSWorkspace.sharedWorkspace openURL:url];
     }
-}
-- (void)classroom:(id)sender {
-    self.classOn = !self.classOn; [self render:YES]; [self.history reloadData]; [self.queue reloadData];
-    if (self.classOn != ((self.window.styleMask & NSWindowStyleMaskFullScreen) != 0)) [self.window toggleFullScreen:nil];
 }
 - (void)about:(id)sender {
     [NSApp orderFrontStandardAboutPanelWithOptions:@{NSAboutPanelOptionApplicationName:@"WX FileHelper",
@@ -494,17 +490,16 @@ int wxRunMac(int smoke) {
             [delegate nextTab:nil]; if (![delegate.active isEqual:first]) return 1;
             [delegate.window setContentSize:NSMakeSize(560,400)]; [delegate layout]; if (!delegate.rail.hidden) return 1;
             [delegate.window setContentSize:NSMakeSize(960,660)]; [delegate layout]; if (delegate.rail.hidden) return 1;
-            delegate.classOn = YES; [delegate render:YES]; if (!delegate.rail.hidden) return 1;
             if (NSMaxX(delegate.refreshQR.frame)>NSWidth(delegate.root.bounds) || NSMaxY(delegate.refreshQR.frame)>NSHeight(delegate.root.bounds)) return 1;
             // Exercise the real transfer controls without signing in to a personal account.
             NSDictionary *online = @{@"ID":first,@"DraftEpoch":@0,@"SignedIn":@YES,@"Name":@"Smoke test",@"Status":@"online",
                 @"Files":@[@{@"Name":@"lesson.pdf",@"Path":@"/tmp/lesson.pdf",@"Size":@1024}],
-                @"Messages":@[@{@"ID":@"smoke-attachment",@"Text":@"lesson.pdf",@"Kind":@"file",@"Size":@1024,@"Timestamp":@1}]};
+                @"Messages":@[@{@"ID":@"smoke-attachment",@"Text":@"lesson.pdf",@"Kind":@"file",@"CanSave":@YES,@"Size":@1024,@"Timestamp":@1}]};
             [delegate applySnapshot:@{@"Accounts":@[online],@"Active":first,@"Revision":@900}];
             [delegate.history selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
             [delegate updateButtons];
             if (delegate.qr.hidden == NO || delegate.queuePane.hidden || delegate.rows.count != 1 || !delegate.send.enabled || !delegate.save.enabled) return 1;
-            if ([[delegate.tabs labelForSegment:0] containsString:@"Smoke test"]) return 1;
+            if (![[delegate.tabs labelForSegment:0] containsString:@"Smoke test"]) return 1;
             return 0;
         }
         app.delegate = delegate; [app run]; return 0;
